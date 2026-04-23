@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+*.log
+*.tmp
+*.bak
+.nuxt
+.vscode
+.idea
+.DS_Store
+package-lock.json
+yarn.lock
