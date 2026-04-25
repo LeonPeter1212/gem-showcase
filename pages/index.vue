@@ -90,7 +90,7 @@
     </section>
 
     <footer class="site-footer">
-      PigaBid &mdash; AI-Assisted 3D Showcase &copy; 2026
+      PigaBid &mdash; 3D Showcase &copy; 2026
     </footer>
   </div>
 </template>
