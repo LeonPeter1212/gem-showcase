@@ -9,12 +9,13 @@ html {
 }
 
 body {
-  background: #03060f;
-  color: #e8eeff;
+  background: radial-gradient(ellipse at 56% 42%, #251808 0%, #100b03 50%, #000000 100%);
+  background-attachment: fixed;
+  color: #f2ede4;
   font-family: 'Inter', system-ui, sans-serif;
   overflow-x: hidden;
 }
 
 ::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #03060f; }
-::-webkit-scrollbar-thumb { background: #1a3aff; border-radius: 2px; }
+::-webkit-scrollbar-track { background: #000; }
+::-webkit-scrollbar-thumb { background: #6b5020; border-radius: 2px; }

@@ -458,10 +458,11 @@ function onResize() {
 }
 
 h1 {
+  font-family: 'Instrument Serif', Georgia, serif;
   font-size: clamp(2.8rem, 6vw, 5.6rem);
-  font-weight: 800;
-  line-height: 1.06;
-  letter-spacing: -0.03em;
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
   color: #f2ede4;
   margin-bottom: 1.8rem;
 }
@@ -469,7 +470,6 @@ h1 {
 h1 em {
   font-style: italic;
   color: #d4920a;
-  font-weight: 700;
 }
 
 .sub {
@@ -516,10 +516,11 @@ h1 em {
 }
 
 .feature-block h2 {
+  font-family: 'Instrument Serif', Georgia, serif;
   font-size: clamp(2rem, 4.5vw, 4rem);
-  font-weight: 800;
-  line-height: 1.08;
-  letter-spacing: -0.025em;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   color: #f2ede4;
   margin-bottom: 1.3rem;
 }
@@ -547,9 +548,10 @@ h1 em {
 }
 
 .footer-brand {
+  font-family: 'Instrument Serif', Georgia, serif;
   font-size: 3.5rem;
-  font-weight: 900;
-  letter-spacing: 0.35em;
+  font-weight: 400;
+  letter-spacing: 0.25em;
   color: #c48a0a;
 }
 
