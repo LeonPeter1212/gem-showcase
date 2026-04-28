@@ -5,7 +5,6 @@
     <canvas ref="canvasEl" class="scene-canvas" />
 
     <!-- Film grain overlay (CSS layer — GLSL grain added via post-process) -->
-    <div class="grain-overlay" />
 
     <!-- ── HERO ──────────────────────────────────────────────────────────── -->
     <section class="section hero-section">
@@ -53,7 +52,7 @@
     </section>
 
     <!-- ── FOOTER ────────────────────────────────────────────────────────── -->
-    <section class="section footer-section">
+    <section ref="footerEl" class="section footer-section">
       <div class="footer-inner">
         <p class="footer-brand">GANJI</p>
         <p class="footer-sub">Built different. &copy; 2026</p>
@@ -86,6 +85,7 @@ const subEl      = ref<HTMLElement | null>(null)
 const feat1El    = ref<HTMLElement | null>(null)
 const feat2El    = ref<HTMLElement | null>(null)
 const feat3El    = ref<HTMLElement | null>(null)
+const footerEl   = ref<HTMLElement | null>(null)
 
 // ── Three.js internals ─────────────────────────────────────────────────────
 let renderer: THREE.WebGLRenderer
@@ -93,15 +93,20 @@ let composer: EffectComposer
 let scene: THREE.Scene
 let camera: THREE.PerspectiveCamera
 let coin: THREE.Group | null = null
+let coinWrapper: THREE.Group | null = null
 let animId: number
 const clock = new THREE.Clock()
+
+// Mouse parallax — target is set instantly, lerp chases it each frame
+const mouseLerp   = { x: 0, y: 0 }
+const mouseTarget = { x: 0, y: 0 }
 
 // Film grain shader — fragment shader that adds analog noise each frame
 const GrainShader = {
   uniforms: {
     tDiffuse: { value: null },
     uTime:    { value: 0 },
-    uAmount:  { value: 0.045 },
+    uAmount:  { value: 0.018 },
   },
   vertexShader: `
     varying vec2 vUv;
@@ -132,29 +137,37 @@ onMounted(() => {
   initThree()
   loadCoin()
   animateHeroText()
-  setupScrollAnimations()
+  // setupScrollAnimations() is called inside loadCoin callback once coin is ready
   window.addEventListener('resize', onResize)
+  window.addEventListener('mousemove', onMouseMove)
 })
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(animId)
   renderer?.dispose()
   window.removeEventListener('resize', onResize)
+  window.removeEventListener('mousemove', onMouseMove)
   ScrollTrigger.getAll().forEach(t => t.kill())
 })
 
+function onMouseMove(e: MouseEvent) {
+  // Normalize to -1..1, Y flipped so up = positive
+  mouseTarget.x =  (e.clientX / window.innerWidth)  * 2 - 1
+  mouseTarget.y = -((e.clientY / window.innerHeight) * 2 - 1)
+}
+
 function initThree() {
   const canvas = canvasEl.value!
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false })
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.setSize(window.innerWidth, window.innerHeight)
   renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = 1.6
+  renderer.toneMappingExposure = 0.75
   renderer.shadowMap.enabled = true
 
   scene = new THREE.Scene()
-  scene.background = new THREE.Color(0x0d0a04)
-  scene.fog = new THREE.FogExp2(0x0d0a04, 0.035)
+  // No scene.background — CSS handles the warm radial gradient (see body style)
+  scene.fog = new THREE.FogExp2(0x000000, 0.018)
 
   // PMREMGenerator — wraps scene for metallic environment reflections
   const pmrem = new THREE.PMREMGenerator(renderer)
@@ -166,29 +179,29 @@ function initThree() {
   camera.position.set(0, 0.3, 6)
 
   // ── Lighting ──────────────────────────────────────────────────────────────
-  // Key — warm white from upper right, main highlight on coin face
-  const key = new THREE.DirectionalLight(0xfff8e8, 9)
-  key.position.set(4, 6, 4)
+  // Key — warm white from upper-right, angled so it doesn't flatten the face
+  const key = new THREE.DirectionalLight(0xfff8e8, 2.5)
+  key.position.set(5, 4, 3)
   key.castShadow = true
   scene.add(key)
 
-  // Rim — warm gold from back-left, creates bright edge silhouette
-  const rimLight = new THREE.DirectionalLight(0xffcc44, 6)
-  rimLight.position.set(-5, 3, -3)
+  // Rim — warm gold from back-left, creates the bright silhouette edge
+  const rimLight = new THREE.DirectionalLight(0xffcc44, 4)
+  rimLight.position.set(-4, 2, -4)
   scene.add(rimLight)
 
-  // Fill — neutral soft from front-below, lifts face without washing out
-  const fill = new THREE.DirectionalLight(0xffe0aa, 2)
-  fill.position.set(0, -2, 6)
+  // Fill — very soft, front-low, lifts the shadow side without flattening
+  const fill = new THREE.DirectionalLight(0xffe0aa, 0.6)
+  fill.position.set(0, -3, 5)
   scene.add(fill)
 
-  // Under warm glow — catches reeded edge from below
-  const under = new THREE.PointLight(0xff9900, 6, 8)
+  // Under glow — warm point light catches reeded edge from below
+  const under = new THREE.PointLight(0xff8800, 2, 7)
   under.position.set(0, -2.5, 1)
   scene.add(under)
 
-  // Ambient — very low warm tone
-  scene.add(new THREE.AmbientLight(0x332211, 1.2))
+  // Ambient — bare minimum so shadowed areas aren't pure black
+  scene.add(new THREE.AmbientLight(0x221a0a, 0.8))
 
   buildStars()
 
@@ -223,12 +236,12 @@ function buildStars() {
 function overrideMaterials(model: THREE.Group) {
   // Warm polished gold — coin face and edge
   const BODY_MAT = new THREE.MeshPhysicalMaterial({
-    color: 0xd4920a,
+    color: 0xc8820a,
     metalness: 1.0,
-    roughness: 0.22,
-    envMapIntensity: 2.5,
-    clearcoat: 0.8,
-    clearcoatRoughness: 0.1,
+    roughness: 0.30,
+    envMapIntensity: 2.2,
+    clearcoat: 0.3,
+    clearcoatRoughness: 0.25,
   })
   // Burnished darker gold — logo sits recessed/darker against the bright face
   const LOGO_MAT = new THREE.MeshPhysicalMaterial({
@@ -283,10 +296,20 @@ function loadCoin() {
   const loader = new GLTFLoader()
   loader.load('/models/ganji-coin.glb', (gltf) => {
     coin = gltf.scene
-    coin.scale.setScalar(1.5)
-    coin.rotation.x = Math.PI * 0.08
+    coin.scale.setScalar(1.15)
+
+    // rotation.x = +PI/2 → front face toward camera; small back-tilt shows top edge
+    coin.rotation.x = Math.PI / 2 - 0.25
+
     overrideMaterials(coin)
-    scene.add(coin)
+
+    // coinWrapper carries scroll-driven position/tilt — clean zero-rotation parent
+    coinWrapper = new THREE.Group()
+    coinWrapper.position.x = 1.8
+    scene.add(coinWrapper)
+    coinWrapper.add(coin)
+
+    setupScrollAnimations()
   })
 }
 
@@ -294,9 +317,15 @@ function renderLoop() {
   animId = requestAnimationFrame(renderLoop)
   const t = clock.getElapsedTime()
 
-  if (coin) {
-    coin.rotation.y = t * 0.35
-    coin.position.y = Math.sin(t * 0.6) * 0.07
+  if (coin && coinWrapper) {
+    // Lerp mouse influence — ~8% per frame gives ~120ms of lag at 60fps
+    mouseLerp.x += (mouseTarget.x - mouseLerp.x) * 0.08
+    mouseLerp.y += (mouseTarget.y - mouseLerp.y) * 0.08
+
+    coin.rotation.y = t * 0.35                                         // continuous spin
+    coin.rotation.x = (Math.PI / 2 - 0.25) + mouseLerp.y * 0.22      // tilt fwd/back with mouse Y
+    coin.rotation.z = -mouseLerp.x * 0.14                             // lean with mouse X
+    coinWrapper.position.y = Math.sin(t * 0.6) * 0.07                 // gentle float
   }
 
   // Update grain shader time uniform every frame (makes noise animate)
@@ -320,51 +349,65 @@ function animateHeroText() {
 
 // ── GSAP: scroll-driven coin + camera ─────────────────────────────────────
 function setupScrollAnimations() {
-  // Section 2 — coin slides right, text enters from left
+  // Single timeline spanning the full page scroll.
+  // Total scroll = 4 × 100vh (5 sections). Timeline = 4 units → 1 unit per 100vh.
+  // Each transition takes 0.4 units (~40vh), rest is hold time.
+  const w = coinWrapper!
+
+  // Scrubbed timeline — each unit = 1 section height (100vh).
+  // No camera zoom — just coin tilt and side-to-side movement.
+  const tl = gsap.timeline({ defaults: { ease: 'power1.inOut' } })
+
+  // Hero → Features: coin tilts slightly to show depth
+  tl.to(w.rotation, { x: 0.15, z: -0.10, duration: 1 })
+
+  // Features → Earn: coin crosses to left, reverses tilt
+  tl.to(w.position, { x: -1.8, duration: 1 })
+  tl.to(w.rotation, { x: -0.15, z: 0.10, duration: 1 }, '<')
+
+  // Earn → Secure: coin returns to right, levels out
+  tl.to(w.position, { x: 1.5, duration: 1 })
+  tl.to(w.rotation, { x: 0, z: 0, duration: 1 }, '<')
+
+  // end = 3 × 100vh so each section maps to exactly 1 timeline unit.
+  // The SECURE state is fully reached at scroll=300vh (section start),
+  // then holds for the remaining footer scroll.
   ScrollTrigger.create({
-    trigger: '#features',
-    start: 'top 80%',
-    onEnter: () => {
-      if (coin) {
-        gsap.to(coin.rotation, { x: 0.25, z: -0.15, duration: 1.3, ease: 'power2.inOut' })
-        gsap.to(coin.position, { x: 1.8,            duration: 1.2, ease: 'power2.inOut' })
-        gsap.to(camera.position, { z: 4.8,           duration: 1.5, ease: 'power2.inOut' })
-      }
-      gsap.from(feat1El.value, { opacity: 0, x: -70, duration: 0.9, ease: 'power3.out' })
+    animation: tl,
+    trigger: document.documentElement,
+    start: 'top top',
+    end: '+=' + window.innerHeight * 3,
+    scrub: 0.8,
+  })
+
+  // Text: snapshot-style (not scrubbed — snaps in as section enters)
+  ScrollTrigger.create({
+    trigger: '#features', start: 'top 60%',
+    onEnter:    () => gsap.fromTo(feat1El.value, { opacity: 0, x: -70 }, { opacity: 1, x: 0, duration: 0.9, ease: 'power3.out' }),
+    onLeaveBack: () => gsap.to(feat1El.value, { opacity: 0, x: -70, duration: 0.5 }),
+  })
+  ScrollTrigger.create({
+    trigger: feat2El.value, start: 'top 60%',
+    onEnter:    () => gsap.fromTo(feat2El.value, { opacity: 0, x: 70 }, { opacity: 1, x: 0, duration: 0.9, ease: 'power3.out' }),
+    onLeaveBack: () => gsap.to(feat2El.value, { opacity: 0, x: 70, duration: 0.5 }),
+  })
+  ScrollTrigger.create({
+    trigger: feat3El.value, start: 'top 60%',
+    onEnter:    () => gsap.fromTo(feat3El.value, { opacity: 0, y: 60 }, { opacity: 1, y: 0, duration: 0.9, ease: 'power3.out' }),
+    onLeaveBack: () => gsap.to(feat3El.value, { opacity: 0, y: 60, duration: 0.5 }),
+  })
+
+  // Footer: fade canvas out as footer sweeps in, restore on scroll back
+  ScrollTrigger.create({
+    trigger: footerEl.value,
+    start: 'top 90%',
+    end: 'top 10%',
+    scrub: 0.6,
+    onUpdate: (self) => {
+      if (canvasEl.value) canvasEl.value.style.opacity = String(1 - self.progress)
     },
     onLeaveBack: () => {
-      if (coin) {
-        gsap.to(coin.rotation, { x: Math.PI * 0.08, z: 0, duration: 1.1, ease: 'power2.inOut' })
-        gsap.to(coin.position, { x: 0,               duration: 1.1, ease: 'power2.inOut' })
-        gsap.to(camera.position, { z: 6,              duration: 1.3, ease: 'power2.inOut' })
-      }
-    },
-  })
-
-  // Section 3 — coin flips to reveal back, text from right
-  ScrollTrigger.create({
-    trigger: feat2El.value,
-    start: 'top 80%',
-    onEnter: () => {
-      if (coin) {
-        gsap.to(coin.rotation, { x: Math.PI + 0.08, duration: 1.5, ease: 'power2.inOut' })
-        gsap.to(coin.position, { x: -1.8,            duration: 1.2, ease: 'power2.inOut' })
-      }
-      gsap.from(feat2El.value, { opacity: 0, x: 70, duration: 0.9, ease: 'power3.out' })
-    },
-  })
-
-  // Section 4 — coin zooms in close to centre
-  ScrollTrigger.create({
-    trigger: feat3El.value,
-    start: 'top 80%',
-    onEnter: () => {
-      if (coin) {
-        gsap.to(coin.rotation, { x: Math.PI * 0.04, z: 0,  duration: 1.4, ease: 'power2.inOut' })
-        gsap.to(coin.position, { x: 0, y: 0,                duration: 1.2, ease: 'power2.inOut' })
-        gsap.to(camera.position, { z: 3.0,                  duration: 1.6, ease: 'power2.inOut' })
-      }
-      gsap.from(feat3El.value, { opacity: 0, y: 60, duration: 0.9, ease: 'power3.out' })
+      if (canvasEl.value) canvasEl.value.style.opacity = '1'
     },
   })
 }
@@ -391,18 +434,6 @@ function onResize() {
   z-index: 0;
 }
 
-/* ── Grain overlay ───────────────────────────────────────────────────────── */
-/* Adds a second layer of CSS grain on top of the WebGL grain for extra depth */
-.grain-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.04;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 160px 160px;
-}
-
 /* ── Sections ────────────────────────────────────────────────────────────── */
 .section {
   position: relative;
@@ -422,7 +453,7 @@ function onResize() {
   font-size: 0.72rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #3366dd;
+  color: #8a7a5a;
   margin-bottom: 1.6rem;
 }
 
@@ -431,26 +462,26 @@ h1 {
   font-weight: 800;
   line-height: 1.06;
   letter-spacing: -0.03em;
-  color: #dde6ff;
+  color: #f2ede4;
   margin-bottom: 1.8rem;
 }
 
 h1 em {
   font-style: italic;
-  color: #4488ff;
+  color: #d4920a;
   font-weight: 700;
 }
 
 .sub {
   font-size: 1.05rem;
   line-height: 1.75;
-  color: #6677aa;
+  color: #7a6e5a;
   margin-bottom: 0.5rem;
 }
 
 .asterisk {
   font-size: 0.68rem;
-  color: #334;
+  color: #3d3020;
   margin-bottom: 2.4rem;
   letter-spacing: 0.02em;
 }
@@ -458,8 +489,8 @@ h1 em {
 .cta-btn {
   display: inline-block;
   padding: 0.9rem 2.2rem;
-  background: #1133ee;
-  color: #fff;
+  background: #c48a0a;
+  color: #000;
   font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -467,7 +498,7 @@ h1 em {
   border-radius: 2px;
   transition: background 0.2s, transform 0.15s;
 }
-.cta-btn:hover { background: #2244ff; transform: translateY(-2px); }
+.cta-btn:hover { background: #e0a010; transform: translateY(-2px); }
 
 /* ── Feature sections ────────────────────────────────────────────────────── */
 .feature-section { justify-content: flex-start; }
@@ -479,7 +510,7 @@ h1 em {
   display: block;
   font-size: 0.65rem;
   letter-spacing: 0.22em;
-  color: #1a44bb;
+  color: #8a7a5a;
   text-transform: uppercase;
   margin-bottom: 1.1rem;
 }
@@ -489,19 +520,19 @@ h1 em {
   font-weight: 800;
   line-height: 1.08;
   letter-spacing: -0.025em;
-  color: #c8d4ff;
+  color: #f2ede4;
   margin-bottom: 1.3rem;
 }
 
 .feature-block h2 em {
   font-style: italic;
-  color: #4488ff;
+  color: #d4920a;
 }
 
 .feature-block p {
   font-size: 1rem;
   line-height: 1.8;
-  color: #556699;
+  color: #6a5e4a;
 }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
@@ -510,24 +541,27 @@ h1 em {
   text-align: center;
   flex-direction: column;
   gap: 0.8rem;
+  background: #ffffff;
+  position: relative;
+  isolation: isolate;
 }
 
 .footer-brand {
   font-size: 3.5rem;
   font-weight: 900;
   letter-spacing: 0.35em;
-  color: #1133ee;
+  color: #c48a0a;
 }
 
 .footer-sub {
-  color: #334466;
+  color: #4a3e2e;
   font-size: 0.88rem;
   letter-spacing: 0.08em;
 }
 
 .footer-fine {
   font-size: 0.62rem;
-  color: #1a2233;
+  color: #2a2016;
   letter-spacing: 0.1em;
   max-width: 480px;
 }
