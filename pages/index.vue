@@ -153,8 +153,8 @@ function initThree() {
   renderer.shadowMap.enabled = true
 
   scene = new THREE.Scene()
-  scene.background = new THREE.Color(0x020510)
-  scene.fog = new THREE.FogExp2(0x020510, 0.035)
+  scene.background = new THREE.Color(0x0d0a04)
+  scene.fog = new THREE.FogExp2(0x0d0a04, 0.035)
 
   // PMREMGenerator — wraps scene for metallic environment reflections
   const pmrem = new THREE.PMREMGenerator(renderer)
@@ -166,29 +166,29 @@ function initThree() {
   camera.position.set(0, 0.3, 6)
 
   // ── Lighting ──────────────────────────────────────────────────────────────
-  // Key — warm-blue area from upper right (like the reference coin photo)
-  const key = new THREE.DirectionalLight(0x88bbff, 10)
-  key.position.set(4, 5, 3)
+  // Key — warm white from upper right, main highlight on coin face
+  const key = new THREE.DirectionalLight(0xfff8e8, 9)
+  key.position.set(4, 6, 4)
   key.castShadow = true
   scene.add(key)
 
-  // Rim — deep blue from back-left (creates silhouette edge like the coins)
-  const rim = new THREE.DirectionalLight(0x2244cc, 8)
-  rim.position.set(-5, 3, -4)
-  scene.add(rim)
+  // Rim — warm gold from back-left, creates bright edge silhouette
+  const rimLight = new THREE.DirectionalLight(0xffcc44, 6)
+  rimLight.position.set(-5, 3, -3)
+  scene.add(rimLight)
 
-  // Fill — soft from front-below (lifts shadows without washing out)
-  const fill = new THREE.DirectionalLight(0x6699ff, 3)
+  // Fill — neutral soft from front-below, lifts face without washing out
+  const fill = new THREE.DirectionalLight(0xffe0aa, 2)
   fill.position.set(0, -2, 6)
   scene.add(fill)
 
-  // Under glow — blue point beneath coin
-  const under = new THREE.PointLight(0x0044ff, 12, 8)
-  under.position.set(0, -2.5, 0.5)
+  // Under warm glow — catches reeded edge from below
+  const under = new THREE.PointLight(0xff9900, 6, 8)
+  under.position.set(0, -2.5, 1)
   scene.add(under)
 
-  // Ambient — very low, preserves the dark drama
-  scene.add(new THREE.AmbientLight(0x1133aa, 1.5))
+  // Ambient — very low warm tone
+  scene.add(new THREE.AmbientLight(0x332211, 1.2))
 
   buildStars()
 
@@ -216,46 +216,63 @@ function buildStars() {
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
   scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
-    size: 0.07, sizeAttenuation: true, color: 0x99bbff, transparent: true, opacity: 0.55,
+    size: 0.07, sizeAttenuation: true, color: 0xffd980, transparent: true, opacity: 0.4,
   })))
 }
 
 function overrideMaterials(model: THREE.Group) {
-  // Override Blender-exported materials with Three.js PBR equivalents
-  // This guarantees consistent rendering regardless of GLTF export quality
-  const COIN_MAT = new THREE.MeshPhysicalMaterial({
-    color: 0x0a2266,
+  // Warm polished gold — coin face and edge
+  const BODY_MAT = new THREE.MeshPhysicalMaterial({
+    color: 0xd4920a,
     metalness: 1.0,
-    roughness: 0.05,
-    envMapIntensity: 3.0,
-    clearcoat: 1.0,
-    clearcoatRoughness: 0.02,
-  })
-  const LOGO_MAT = new THREE.MeshPhysicalMaterial({
-    color: 0x4488ff,
-    metalness: 1.0,
-    roughness: 0.15,
+    roughness: 0.22,
     envMapIntensity: 2.5,
-    clearcoat: 0.5,
+    clearcoat: 0.8,
+    clearcoatRoughness: 0.1,
   })
+  // Burnished darker gold — logo sits recessed/darker against the bright face
+  const LOGO_MAT = new THREE.MeshPhysicalMaterial({
+    color: 0x7a4800,
+    metalness: 1.0,
+    roughness: 0.38,
+    envMapIntensity: 1.8,
+  })
+  // Slightly darker mid-gold — hairline rings (subtle groove contrast)
   const RING_MAT = new THREE.MeshPhysicalMaterial({
-    color: 0x2255cc,
-    metalness: 0.9,
-    roughness: 0.2,
-    transparent: true,
-    opacity: 0.75,
-    envMapIntensity: 2.0,
+    color: 0xa06a00,
+    metalness: 1.0,
+    roughness: 0.45,
+    envMapIntensity: 1.5,
+  })
+  // Bright gold — reeded edge catches the rim light
+  const EDGE_MAT = new THREE.MeshPhysicalMaterial({
+    color: 0xf0b020,
+    metalness: 1.0,
+    roughness: 0.18,
+    envMapIntensity: 3.0,
+    clearcoat: 0.6,
+  })
+  // Rim text — bright, readable
+  const RIM_MAT = new THREE.MeshPhysicalMaterial({
+    color: 0xf5c030,
+    metalness: 1.0,
+    roughness: 0.20,
+    envMapIntensity: 2.2,
   })
 
   model.traverse((child) => {
     if (!(child instanceof THREE.Mesh)) return
     const n = child.name
-    if (n.includes('Orbit') || n.includes('Ring') || n.includes('Torus')) {
-      child.material = RING_MAT
-    } else if (n.includes('Logo') || n.includes('Text') || n.includes('GanjiLogo')) {
+    if (n === 'GanjiEdge') {
+      child.material = EDGE_MAT
+    } else if (n === 'GanjiLogo') {
       child.material = LOGO_MAT
+    } else if (n === 'RingInner' || n === 'RingOuter') {
+      child.material = RING_MAT
+    } else if (n === 'RimText') {
+      child.material = RIM_MAT
     } else {
-      child.material = COIN_MAT
+      child.material = BODY_MAT
     }
     child.castShadow = true
     child.receiveShadow = true
