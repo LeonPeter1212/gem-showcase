@@ -1,7 +1,3 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -13,17 +9,8 @@ html {
 }
 
 body {
-  background: #050510;
-  color: #f0f0f8;
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  background: #0a0a0a;
+  color: #f0ede8;
+  font-family: system-ui, sans-serif;
   overflow-x: hidden;
 }
-
-h1, h2, h3 {
-  font-family: 'Lora', Georgia, serif;
-}
-
-/* Smooth scrollbar */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #0a0a1a; }
-::-webkit-scrollbar-thumb { background: #3b1fa8; border-radius: 2px; }
